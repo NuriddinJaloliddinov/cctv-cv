@@ -25,3 +25,4 @@ requests>=2.31,<3.0
 # ONVIF Discovery
 onvif-zeep>=0.2.12
 WSDiscovery>=2.0.0
+psutil>=5.9

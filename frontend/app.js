@@ -134,8 +134,18 @@ function render() {
     const needsCreds = cam.source_type === 'onvif' && !cam.rtsp_url;
     $('creds').hidden = !needsCreds;
     $('run').textContent = feeds.has(cam.id) ? 'Stop' : 'Run CV Model';
+
+    $('find-feeds').hidden = cam.source_type !== 'onvif';
+    const chans = $('channels');
+    if (chans.dataset.camId !== cam.id) {
+      chans.hidden = true;
+      chans.innerHTML = '';
+      chans.dataset.camId = '';
+    }
   } else {
     $('creds').hidden = true;
+    $('find-feeds').hidden = true;
+    $('channels').hidden = true;
     $('run').textContent = 'Run CV Model';
   }
 }
@@ -191,7 +201,8 @@ async function addDiscovered(address) {
       body: JSON.stringify({
         name: d.name,
         address: d.address,
-        source_type: 'onvif',
+        rtsp_url: d.rtsp_url || null,
+        source_type: d.source_type || 'onvif',
       }),
     });
     discoveredCameras = discoveredCameras.filter(c => c.address !== address);
@@ -370,6 +381,92 @@ $('run').onclick = async () => {
     alert('Failed to start: ' + e.message);
   }
 };
+
+// ---------- Credential-based feed check (ONVIF) ----------
+
+async function findFeeds() {
+  const cam = savedCameras.find(c => c.id === selectedId);
+  if (!cam) return;
+  const user = $('onvif-user').value;
+  const pass = $('onvif-pass').value;
+  const btn = $('find-feeds');
+  btn.disabled = true;
+  btn.textContent = 'Checking feeds…';
+  try {
+    await api(`/api/cameras/${encodeURIComponent(cam.id)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ onvif_user: user, onvif_pass: pass }),
+    });
+    cam.onvif_user = user;
+    cam.onvif_pass = pass;
+    const feeds = await api(`/api/cameras/${encodeURIComponent(cam.id)}/profiles`, {
+      method: 'POST',
+      body: JSON.stringify({ onvif_user: user, onvif_pass: pass }),
+    });
+    renderChannels(cam, feeds);
+    log(`${cam.name}: ${feeds.filter(f => f.accessible).length}/${feeds.length} feed(s) accessible`);
+  } catch (e) {
+    alert('Feed check failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Check feeds with these credentials';
+  }
+}
+
+function renderChannels(cam, feeds) {
+  const box = $('channels');
+  box.dataset.camId = cam.id;
+  box.hidden = false;
+  if (!feeds.length) {
+    box.innerHTML = '<div class="empty-state">Device reports no media profiles.</div>';
+    return;
+  }
+  box.innerHTML = feeds.map(f => {
+    const address = `${cam.address}#${f.token}`;
+    const added = savedCameras.some(c => c.address === address);
+    const size = f.width ? `${f.width}×${f.height}` : '';
+    const badge = f.accessible
+      ? '<span class="badge badge-saved">video OK</span>'
+      : `<span class="badge badge-new" title="${escapeHtml(f.error || 'no video')}">no video</span>`;
+    const action = !f.accessible
+      ? ''
+      : added
+        ? '<span class="badge">added</span>'
+        : `<button class="btn-mini btn-mini-primary" data-token="${escapeHtml(f.token)}">Add</button>`;
+    return `<div class="channel">
+      <div><b>${escapeHtml(f.name)}</b><small>${escapeHtml(size)} ${escapeHtml(f.encoding || '')}</small></div>
+      <div>${badge}${action}</div>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('button[data-token]').forEach(b => {
+    const feed = feeds.find(f => f.token === b.dataset.token);
+    b.onclick = () => addChannel(cam, feed);
+  });
+}
+
+async function addChannel(cam, feed) {
+  if (!feed || !feed.rtsp_url) return;
+  try {
+    const created = await api('/api/cameras', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: `${cam.name} – ${feed.name}`,
+        address: `${cam.address}#${feed.token}`,
+        rtsp_url: feed.rtsp_url,
+        source_type: 'onvif',
+        onvif_user: cam.onvif_user || '',
+        onvif_pass: cam.onvif_pass || '',
+      }),
+    });
+    selectedId = created.id;
+    await loadCameras();
+    log(`Added channel: ${created.name}`);
+  } catch (e) {
+    alert('Add failed: ' + e.message);
+  }
+}
+
+$('find-feeds').onclick = findFeeds;
 
 // ---------- Restore running pipelines on reload ----------
 

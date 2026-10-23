@@ -417,3 +417,39 @@ input:focus, select:focus {
   outline: none;
   border-color: var(--accent-green);
 }
+
+/* ONVIF feed check */
+.form-row[hidden], .channel-list[hidden] { display: none; }
+
+.channel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.channel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-main);
+  font-size: 13px;
+}
+
+.channel small {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.channel > div:last-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}

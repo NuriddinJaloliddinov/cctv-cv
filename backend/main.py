@@ -2,6 +2,7 @@
 import shutil
 import tempfile
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -33,6 +34,11 @@ class PersonUpdate(BaseModel):
     notes: str | None = None
 
 
+class ProfilesRequest(BaseModel):
+    onvif_user: str | None = None
+    onvif_pass: str | None = None
+
+
 # ---------- App lifecycle ----------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -48,8 +54,12 @@ _peers: dict[str, RTCPeerConnection] = {}
 # ---------- Discovery / capabilities ----------
 
 @app.get("/api/discover")
-def discover() -> list[CameraInfo]:
-    return discovery.discover_devices()
+def discover(subnet: str | None = None) -> list[CameraInfo]:
+    """Credential-free discovery of devices exposing ONVIF or RTSP."""
+    try:
+        return discovery.discover_devices(subnet=subnet)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.get("/api/capabilities")
@@ -123,6 +133,36 @@ def resolve_camera_rtsp(camera_id: str):
         raise HTTPException(400, str(e))
     db.update_camera(camera_id, {"rtsp_url": url})
     return {"rtsp_url": url}
+
+
+@app.post("/api/cameras/{camera_id}/profiles")
+def camera_profiles(camera_id: str, body: ProfilesRequest | None = None) -> list[dict]:
+    """List every media profile (NVR channel) and test its video feed.
+
+    Uses credentials supplied by the user, or the ones already saved for
+    the camera. Each profile is reported as accessible only when a frame
+    can actually be decoded from its RTSP URI.
+    """
+    cam = db.get_camera(camera_id)
+    if cam is None:
+        raise HTTPException(404, "Camera not found")
+    if cam.source_type != "onvif":
+        raise HTTPException(400, "Only ONVIF cameras expose media profiles")
+
+    user = body.onvif_user if body and body.onvif_user is not None else cam.onvif_user
+    password = body.onvif_pass if body and body.onvif_pass is not None else cam.onvif_pass
+    try:
+        profiles = discovery.fetch_stream_profiles(cam.address, user or "", password or "")
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+
+    def verify(profile: dict) -> dict:
+        if not profile.get("rtsp_url"):
+            return {**profile, "accessible": False}
+        return {**profile, **discovery.check_stream(profile["rtsp_url"])}
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        return list(pool.map(verify, profiles))
 
 
 # ---------- Pipeline ----------
