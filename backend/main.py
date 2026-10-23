@@ -220,25 +220,36 @@ def get_thumbnail(person_id: str):
 
 
 async def _samples_from_uploads(files: list[UploadFile]):
-    """Turn a list of image/video uploads into [(crop, embedding)] tuples."""
+    """Turn a list of image/video uploads into [(crop, embedding)] tuples.
+
+    Collects per-file error reasons so the API can tell the user WHY each
+    file failed (blurry / no face / multiple faces / unsupported format).
+    """
     all_samples, errors = [], []
     for f in files:
+        fname = f.filename or "upload"
         try:
             raw = await f.read()
-            suffix = Path(f.filename or "upload").suffix.lower()
+            suffix = Path(fname).suffix.lower()
             if suffix in VIDEO_EXTS:
                 with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
                     tmp.write(raw)
                     tmp_path = tmp.name
                 try:
-                    samples = enroll.extract_from_video(tmp_path)
+                    samples, reason = enroll.extract_from_video(tmp_path)
                 finally:
                     Path(tmp_path).unlink(missing_ok=True)
             else:
-                samples = enroll.extract_from_image(raw)
-            all_samples.extend(samples)
+                samples, reason = enroll.extract_from_image(raw)
+
+            if samples:
+                all_samples.extend(samples)
+            elif reason:
+                errors.append(f"{fname}: {reason}")
+            else:
+                errors.append(f"{fname}: no usable samples")
         except Exception as e:
-            errors.append(f"{f.filename}: {e}")
+            errors.append(f"{fname}: {e}")
     return all_samples, errors
 
 
@@ -256,11 +267,8 @@ async def create_person_endpoint(
 
     samples, errors = await _samples_from_uploads(files)
     if not samples:
-        raise HTTPException(
-            400,
-            "No usable faces found. Upload images/videos where exactly one "
-            "clear face is visible per frame. " + "; ".join(errors),
-        )
+        detail = "; ".join(errors) if errors else "no images processed"
+        raise HTTPException(400, "No usable faces found — " + detail)
 
     person_id = uuid.uuid4().hex
     person_dir = PERSONS_DIR / person_id

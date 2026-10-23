@@ -15,7 +15,8 @@ try {
 $commonPkgs = @(
     "fastapi", "uvicorn[standard]", "python-multipart", "python-dotenv", 
     "numpy", "opencv-python-headless", "onnx", "ultralytics", "onnxslim", 
-    "aiortc", "av", "requests", "onvif-zeep", "WSDiscovery"
+    "aiortc", "av", "requests", "onvif-zeep", "WSDiscovery",
+    "pillow-heif"
 )
 
 # 3. Install based on hardware
