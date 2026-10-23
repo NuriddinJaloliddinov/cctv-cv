@@ -53,4 +53,21 @@ foreach ($name in $models.Keys) {
         Write-Host "  Manual: $($models[$name]) -> $path"
     }
 }
+Write-Host "`nSetting up person detector..." -ForegroundColor Cyan
+$yoloPath = Join-Path $dataDir "yolov8n.onnx"
+if (Test-Path $yoloPath) {
+    Write-Host "  yolov8n.onnx already present" -ForegroundColor Green
+} else {
+    Write-Host "  Exporting yolov8n.onnx (downloads yolov8n.pt on first run)..." -ForegroundColor Yellow
+    python -c "from ultralytics import YOLO; YOLO('yolov8n.pt').export(format='onnx', imgsz=640, opset=12, simplify=True)"
+    if (Test-Path "yolov8n.onnx") {
+        Move-Item -Force "yolov8n.onnx" $yoloPath
+        Remove-Item -Force "yolov8n.pt" -ErrorAction SilentlyContinue
+        Write-Host "  Saved $yoloPath" -ForegroundColor Green
+    } else {
+        Write-Host "  Export failed. Run manually:" -ForegroundColor Red
+        Write-Host "  python -c `"from ultralytics import YOLO; YOLO('yolov8n.pt').export(format='onnx')`"" -ForegroundColor Red
+    }
+}
+
 Write-Host "`nSetup complete! Run 'python run.py' to start the server." -ForegroundColor Cyan
