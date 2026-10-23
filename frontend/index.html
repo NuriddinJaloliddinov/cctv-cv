@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CCTV CV Dashboard</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icon">⚡</div>
+        <span>CCTV CV</span>
+      </div>
+      <nav class="nav-links">
+        <a href="#" class="active">🏠 Dashboard</a>
+        <a href="#">📹 Cameras</a>
+        <a href="#">📊 Analytics</a>
+        <a href="#">⚙️ Settings</a>
+      </nav>
+      <div class="user-profile">
+        <div class="avatar">U</div>
+        <div class="user-info">
+          <span class="name">User</span>
+          <span class="role">Admin</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="top-bar">
+        <div class="search-bar">
+          <input type="text" placeholder="Search cameras, IPs...">
+          <span>🔍</span>
+        </div>
+        <div class="top-actions">
+          <div class="status-badge">Server Online</div>
+        </div>
+      </header>
+
+      <div class="dashboard-grid">
+        <div class="card controls-card">
+          <div class="card-header">
+            <h2>Camera Setup</h2>
+            <button id="discover" class="btn btn-primary">Discover NVR & Camera</button>
+          </div>
+
+          <div class="manual-add">
+            <input id="manual-url" placeholder="http://192.168.1.5:8080/video">
+            <button id="add-manual" class="btn btn-outline">Add URL</button>
+          </div>
+
+          <div id="setup" class="setup-panel" hidden>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Select Camera</label>
+                <select id="camera-select"></select>
+              </div>
+              <div class="form-group">
+                <label>Device (Compute)</label>
+                <select id="device-select"></select>
+              </div>
+              <div class="form-group">
+                <label>FPS Limit</label>
+                <input id="fps" type="number" value="10" min="1" max="30">
+              </div>
+            </div>
+
+            <div id="creds" class="form-row" hidden>
+              <div class="form-group">
+                <input id="onvif-user" placeholder="ONVIF Username">
+              </div>
+              <div class="form-group">
+                <input id="onvif-pass" type="password" placeholder="ONVIF Password">
+              </div>
+            </div>
+
+            <button id="run" class="btn btn-success btn-block">Run CV Model</button>
+          </div>
+        </div>
+
+        <div class="card list-card">
+          <div class="card-header">
+            <h2>Available Cameras</h2>
+          </div>
+          <div id="results" class="device-list">
+            <div class="empty-state">No cameras yet. Click Discover or add a URL.</div>
+          </div>
+        </div>
+
+        <div class="card enroll-card">
+          <div class="card-header">
+            <h2>People (Face Recognition)</h2>
+            <button id="enroll-person" class="btn btn-primary">+ Enroll Person</button>
+          </div>
+          <div id="persons" class="persons-list">
+            <div class="empty-state">No enrolled people yet.</div>
+          </div>
+        </div>
+
+        <div class="card feeds-card">
+          <div class="card-header">
+            <h2>Live Analytics Feed</h2>
+          </div>
+          <div id="feeds" class="feeds-grid">
+            <div class="empty-state">No active streams. Select a camera and click Run.</div>
+          </div>
+        </div>
+      </div>
+
+      <pre id="log" class="log-panel"></pre>
+    </main>
+  </div>
+
+  <!-- Edit camera modal -->
+  <div id="edit-modal" class="modal" hidden>
+    <div class="modal-content">
+      <h2>Edit Camera</h2>
+      <div class="form-group"><label>Name</label><input id="edit-name"></div>
+      <div class="form-group"><label>Address</label><input id="edit-address"></div>
+      <div class="form-group"><label>RTSP URL (leave empty to resolve via ONVIF)</label><input id="edit-rtsp"></div>
+      <div class="form-group">
+        <label>Source Type</label>
+        <select id="edit-source">
+          <option value="onvif">ONVIF</option>
+          <option value="mobile">Mobile / MJPEG</option>
+          <option value="manual-rtsp">Manual RTSP</option>
+        </select>
+      </div>
+      <div class="form-group"><label>ONVIF Username</label><input id="edit-user"></div>
+      <div class="form-group"><label>ONVIF Password</label><input id="edit-pass" type="password"></div>
+      <div class="form-group">
+        <label>Default Device</label>
+        <select id="edit-device"></select>
+      </div>
+      <div class="form-group"><label>Default FPS</label><input id="edit-fps" type="number" min="1" max="30"></div>
+      <div class="modal-actions">
+        <button id="edit-cancel" class="btn btn-outline">Cancel</button>
+        <button id="edit-save" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+    <!-- Enroll person modal -->
+  <div id="enroll-modal" class="modal" hidden>
+    <div class="modal-content">
+      <h2>Enroll Person</h2>
+      <div class="form-group">
+        <label>Name</label>
+        <input id="enroll-name" placeholder="Full name">
+      </div>
+      <div class="form-group">
+        <label>Notes (optional)</label>
+        <textarea id="enroll-notes" rows="2"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Images / videos (one clear face per image or frame)</label>
+        <input id="enroll-files" type="file" multiple accept="image/*,video/*">
+      </div>
+      <div id="enroll-status" class="enroll-status"></div>
+      <div class="modal-actions">
+        <button id="enroll-cancel" class="btn btn-outline">Cancel</button>
+        <button id="enroll-submit" class="btn btn-primary">Enroll</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

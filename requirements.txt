@@ -1,0 +1,26 @@
+# Core Web Framework
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.29,<1.0
+python-multipart>=0.0.9
+python-dotenv>=1.0.0
+
+# Computer Vision & AI
+numpy>=1.24,<3.0
+opencv-python-headless>=4.9,<5.0
+onnx>=1.16,<2.0
+ultralytics>=8.0,<9.0
+onnxslim>=0.1.82
+
+# Inference Engine
+# NOTE: If deploying to a machine with an NVIDIA GPU, replace the next line with:
+# onnxruntime-gpu>=1.17,<2.0
+onnxruntime>=1.17,<2.0
+
+# Video Streaming & Network
+aiortc>=1.6,<2.0
+av>=12.0,<15.0
+requests>=2.31,<3.0
+
+# ONVIF Discovery
+onvif-zeep>=0.2.12
+WSDiscovery>=2.0.0
