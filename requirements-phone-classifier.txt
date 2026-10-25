@@ -1,0 +1,3 @@
+# Optional runtime for the pretrained phone-use TFLite model (CPU).
+# Install only if using data/phone_detection_model.tflite.
+tensorflow-cpu>=2.16,<2.21

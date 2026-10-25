@@ -5,7 +5,7 @@ import numpy as np
 
 from . import db
 from .config import FACE_MATCH_THRESHOLD
-from .enroll import get_engine
+from .enroll import get_engine, face_quality_reason
 
 _matcher = None
 _lock = threading.Lock()
@@ -46,15 +46,17 @@ def get_matcher() -> Matcher:
         return _matcher
 
 
-def identify(frame: np.ndarray, boxes: list) -> list:
-    """For each YOLO person box, return (name, score) or None."""
+def identify(frame: np.ndarray, boxes: list, with_unknown=False):
+    """Return matches; optionally also return enrollment-quality unmatched faces."""
     try:
         engine = get_engine()
     except RuntimeError:
-        return [None] * len(boxes)
+        empty = [None] * len(boxes)
+        return (empty, []) if with_unknown else empty
 
     matcher = get_matcher()
     results: list = [None] * len(boxes)
+    unknown = []
     fh, fw = frame.shape[:2]
 
     for i, (x1, y1, x2, y2, _) in enumerate(boxes):
@@ -74,6 +76,16 @@ def identify(frame: np.ndarray, boxes: list) -> list:
             m = matcher.match(emb)
             if m is not None:
                 results[i] = m
+            elif (with_unknown and len(faces) == 1
+                  and face_quality_reason(crop, face) is None):
+                x, y, w, h = [int(v) for v in face[:4]]
+                pad_x, pad_y = int(w * .5), int(h * .5)
+                left, top = max(0, x - pad_x), max(0, y - pad_y)
+                right = min(crop.shape[1], x + w + pad_x)
+                bottom = min(crop.shape[0], y + h + pad_y)
+                face_image = crop[top:bottom, left:right]
+                if face_image.size:
+                    unknown.append((i, face_image.copy(), emb))
         except Exception:
             continue                                  # per-box resilience
-    return results
+    return (results, unknown) if with_unknown else results

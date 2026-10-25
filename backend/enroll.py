@@ -10,6 +10,7 @@ Handles:
 """
 import io
 import threading
+import time
 from pathlib import Path
 
 import cv2
@@ -35,6 +36,8 @@ except ImportError:
 
 _engine = None
 _engine_lock = threading.Lock()
+_engine_error: str | None = None
+_engine_retry_at = 0.0
 
 
 def is_available() -> bool:
@@ -61,27 +64,50 @@ class FaceEngine:
             detector_path, "", (320, 320), 0.7, 0.3, 5000,
         )
         self.recognizer = cv2.FaceRecognizerSF.create(embedder_path, "")
+        self._inference_lock = threading.Lock()
 
     def detect(self, image_bgr: np.ndarray) -> list[np.ndarray]:
         h, w = image_bgr.shape[:2]
-        self.detector.setInputSize((w, h))
-        _, faces = self.detector.detect(image_bgr)
+        # YuNet has mutable input size; parallel camera/enrollment calls must
+        # not change it while a detection is running.
+        with self._inference_lock:
+            self.detector.setInputSize((w, h))
+            _, faces = self.detector.detect(image_bgr)
         if faces is None:
             return []
         return [faces[i] for i in range(len(faces))]
 
-    def embed(self, image_bgr: np.ndarray, face_row: np.ndarray) -> np.ndarray:
-        aligned = self.recognizer.alignCrop(image_bgr, face_row)
-        feat = self.recognizer.feature(aligned).flatten().astype(np.float32)
+    def align_embed(self, image_bgr: np.ndarray, face_row: np.ndarray):
+        with self._inference_lock:
+            aligned = self.recognizer.alignCrop(image_bgr, face_row)
+            feat = self.recognizer.feature(aligned).flatten().astype(np.float32)
         n = np.linalg.norm(feat)
-        return feat / n if n > 0 else feat
+        return aligned, feat / n if n > 0 else feat
+
+    def embed(self, image_bgr: np.ndarray, face_row: np.ndarray) -> np.ndarray:
+        return self.align_embed(image_bgr, face_row)[1]
 
 
 def get_engine() -> FaceEngine:
-    global _engine
+    """Load the face models once; cache a failure for a short while.
+
+    Runtime recognition calls this on live frames. Re-attempting a missing
+    model on every frame (and for every person box) wasted time and spammed
+    the pipeline, so remember the error and retry only every 30 seconds.
+    """
+    global _engine, _engine_error, _engine_retry_at
     with _engine_lock:
         if _engine is None:
-            _engine = FaceEngine(FACE_DETECT_MODEL, FACE_EMBED_MODEL)
+            now = time.monotonic()
+            if _engine_error is not None and now < _engine_retry_at:
+                raise RuntimeError(_engine_error)
+            try:
+                _engine = FaceEngine(FACE_DETECT_MODEL, FACE_EMBED_MODEL)
+                _engine_error = None
+            except Exception as e:
+                _engine_error = str(e)
+                _engine_retry_at = now + 30.0
+                raise
         return _engine
 
 
@@ -142,29 +168,36 @@ def _extract_one(img: np.ndarray) -> tuple[list, str | None]:
         return [], f"{n} faces detected (need exactly 1)"
 
     face = faces[0]
+    reason = face_quality_reason(img, face)
+    if reason:
+        return [], reason
+
+    aligned, emb = engine.align_embed(img, face)
+    return [(aligned, emb)], None
+
+
+def face_quality_reason(img: np.ndarray, face: np.ndarray) -> str | None:
+    """Shared live-capture/enrollment quality gate for a detected face."""
     x, y, w, h = [int(v) for v in face[:4]]
     score = float(face[14])
 
     if w < FACE_MIN_SIZE or h < FACE_MIN_SIZE:
-        return [], f"face too small ({w}x{h}, need >= {FACE_MIN_SIZE})"
+        return f"face too small ({w}x{h}, need >= {FACE_MIN_SIZE})"
     if score < _MIN_DETECT_SCORE:
-        return [], f"low confidence ({score:.2f})"
+        return f"low confidence ({score:.2f})"
 
     ih, iw = img.shape[:2]
     crop = img[max(0, y):min(ih, y + h), max(0, x):min(iw, x + w)]
     if crop.size == 0:
-        return [], "face crop empty (bbox out of bounds)"
+        return "face crop empty (bbox out of bounds)"
 
     sharpness = cv2.Laplacian(
         cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY), cv2.CV_64F
     ).var()
     if sharpness < _MIN_SHARPNESS:
-        return [], (f"face too blurry "
-                    f"(sharpness {sharpness:.0f}, need >= {_MIN_SHARPNESS:.0f})")
-
-    aligned = engine.recognizer.alignCrop(img, face)
-    emb = engine.embed(img, face)
-    return [(aligned, emb)], None
+        return (f"face too blurry "
+                f"(sharpness {sharpness:.0f}, need >= {_MIN_SHARPNESS:.0f})")
+    return None
 
 
 def _try_all_orientations(img: np.ndarray) -> tuple[list, str | None]:

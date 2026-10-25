@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CCTV CV Dashboard</title>
+  <meta name="color-scheme" content="light">
+  <title>CCTV CV</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -13,163 +14,778 @@
         <div class="logo-icon">⚡</div>
         <span>CCTV CV</span>
       </div>
-      <nav class="nav-links">
-        <a href="#" class="active">🏠 Dashboard</a>
-        <a href="#">📹 Cameras</a>
-        <a href="#">📊 Analytics</a>
-        <a href="#">⚙️ Settings</a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="#/dashboard" class="nav-link" data-view="dashboard">
+          <span class="nav-icon" aria-hidden="true">🏠</span><span>Overview</span>
+        </a>
+        <a href="#/cameras" class="nav-link" data-view="cameras">
+          <span class="nav-icon" aria-hidden="true">📹</span><span>Cameras</span>
+        </a>
+        <a href="#/enrollment" class="nav-link" data-view="enrollment">
+          <span class="nav-icon" aria-hidden="true">👤</span><span>Enrollment</span>
+        </a>
+        <a href="#/attendance" class="nav-link" data-view="attendance">
+          <span class="nav-icon" aria-hidden="true">🗓️</span><span>Attendance</span>
+        </a>
+        <a href="#/customers" class="nav-link" data-view="customers">
+          <span class="nav-icon" aria-hidden="true">🛍️</span><span>Customers</span>
+        </a>
+        <a href="#/training" class="nav-link" data-view="training" data-admin-only>
+          <span class="nav-icon" aria-hidden="true">🏷️</span><span>Training</span>
+        </a>
+        <a href="#/telegram" class="nav-link" data-view="telegram">
+          <span class="nav-icon" aria-hidden="true">✈️</span><span>Telegram</span>
+        </a>
+        <a href="#/accounts" class="nav-link" data-view="accounts" data-admin-only>
+          <span class="nav-icon" aria-hidden="true">🔐</span><span>Accounts</span>
+        </a>
       </nav>
       <div class="user-profile">
-        <div class="avatar">U</div>
+        <div class="avatar" id="user-avatar">U</div>
         <div class="user-info">
-          <span class="name">User</span>
-          <span class="role">Admin</span>
+          <span class="name" id="user-name">User</span>
+          <span class="role" id="user-role">Administrator</span>
         </div>
+      </div>
+      <div class="sidebar-account-actions">
+        <button class="btn" id="change-password" type="button">Password</button>
+        <button class="btn" id="logout" type="button">Sign out</button>
       </div>
     </aside>
 
     <main class="main-content">
       <header class="top-bar">
-        <div class="search-bar">
-          <input type="text" placeholder="Search cameras, IPs...">
-          <span>🔍</span>
+        <div class="page-heading">
+          <h1 id="page-title">Cameras</h1>
+          <p id="page-subtitle" class="page-subtitle">Add cameras, tune settings, and watch live analytics.</p>
         </div>
         <div class="top-actions">
-          <div class="status-badge">Server Online</div>
+          <span id="server-badge" class="status-badge">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="server-label">Server online</span>
+          </span>
         </div>
       </header>
 
-      <div class="dashboard-grid">
-        <div class="card controls-card">
-          <div class="card-header">
-            <h2>Camera Setup</h2>
-            <button id="discover" class="btn btn-primary">Discover NVR & Camera</button>
+      <div id="readonly-banner" class="alert alert-info" role="status" hidden>
+        You are signed in with a read-only account. Configuration, accounts and
+        other changes are disabled.
+      </div>
+
+      <!-- ============ Overview ============ -->
+      <section id="view-dashboard" class="view" hidden>
+        <div id="overview-summary" class="attendance-summary overview-summary" role="status"></div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2>Attendance</h2>
+                <p class="hint">Confirmed entrance and exit crossings for enrolled people.</p>
+              </div>
+              <button class="btn-mini" data-action="refresh-overview" type="button">Refresh</button>
+            </div>
+            <div id="overview-attendance" class="attendance-log">
+              <div class="empty-state empty-state-sm">No attendance records yet.</div>
+            </div>
           </div>
 
-          <div class="manual-add">
-            <input id="manual-url" placeholder="http://192.168.1.5:8080/video">
-            <button id="add-manual" class="btn btn-outline">Add URL</button>
-          </div>
-
-          <div id="setup" class="setup-panel" hidden>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Select Camera</label>
-                <select id="camera-select"></select>
-              </div>
-              <div class="form-group">
-                <label>Device (Compute)</label>
-                <select id="device-select"></select>
-              </div>
-              <div class="form-group">
-                <label>FPS Limit</label>
-                <input id="fps" type="number" value="10" min="1" max="30">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2>Customers <span id="overview-customer-count" class="count-pill">0</span></h2>
+                <p class="hint">Crossings from entrance/exit cameras with <b>Count as Customer</b> enabled.</p>
               </div>
             </div>
-
-            <div id="creds" class="form-row" hidden>
-              <div class="form-group">
-                <input id="onvif-user" placeholder="ONVIF Username">
-              </div>
-              <div class="form-group">
-                <input id="onvif-pass" type="password" placeholder="ONVIF Password">
-              </div>
+            <div id="overview-customers" class="events-list">
+              <div class="empty-state empty-state-sm">No customer events yet.</div>
             </div>
-
-            <button id="find-feeds" class="btn btn-outline btn-block" type="button" hidden>
-              Check feeds with these credentials
-            </button>
-            <div id="channels" class="channel-list" hidden></div>
-
-            <button id="run" class="btn btn-success btn-block">Run CV Model</button>
           </div>
         </div>
 
-        <div class="card list-card">
-          <div class="card-header">
-            <h2>Available Cameras</h2>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2>Recent events</h2>
+                <p class="hint">Phone-use and entrance/exit incidents, including events that are not confirmed yet.</p>
+              </div>
+            </div>
+            <div id="overview-events" class="events-list">
+              <div class="empty-state empty-state-sm">No events yet.</div>
+            </div>
           </div>
-          <div id="results" class="device-list">
-            <div class="empty-state">No cameras yet. Click Discover or add a URL.</div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2>Not confirmed <span id="overview-pending-count" class="count-pill">0</span></h2>
+                <p class="hint">Events waiting for a Telegram group administrator to confirm or reject them.</p>
+              </div>
+            </div>
+            <div id="overview-pending" class="events-list">
+              <div class="empty-state empty-state-sm">No events waiting for confirmation.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ Training / review ============ -->
+      <section id="view-training" class="view" data-admin-only hidden>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Review &amp; Label <span id="review-count" class="count-pill">0</span></h2>
+              <p class="hint">Review uncertain predictions and missed events. If the detector boxed an empty area, label it No person; that sample is kept for diagnosis, not phone-use classifier training.</p>
+            </div>
+            <button id="review-refresh" class="btn btn-outline" type="button">Refresh</button>
+          </div>
+          <div class="review-capture-settings">
+            <h3>Automatic snapshot capture</h3>
+            <p id="review-capture-status" class="hint" role="status"></p>
+            <div class="review-scope" role="group" aria-label="Capture setting scope">
+              <label class="check-row"><input id="review-scope-global" name="review-scope" type="radio" value="global" checked>Global · all cameras</label>
+              <label class="check-row"><input id="review-scope-exclusive" name="review-scope" type="radio" value="exclusive">Exclusive · selected cameras</label>
+            </div>
+            <div id="review-capture-cameras" class="review-capture-cameras" hidden></div>
+            <div class="form-row review-controls">
+              <label class="check-row"><input id="review-capture-enabled" type="checkbox">Enable automatic capture</label>
+              <div class="form-group"><label for="review-capture-rate">Maximum snapshots per camera per rolling hour</label>
+                <select id="review-capture-rate"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5">5</option><option value="custom">Custom</option></select>
+              </div>
+              <div class="form-group" id="review-capture-custom-group" hidden>
+                <label for="review-capture-custom">Custom maximum (1–120)</label>
+                <input id="review-capture-custom" type="number" min="1" max="120" step="1" value="1">
+              </div>
+              <button id="review-capture-save" type="button" class="btn btn-primary">Save capture settings</button>
+            </div>
+            <p class="hint">Global Off stops capture everywhere. Saving Global settings replaces Exclusive overrides. Exclusive changes only the selected cameras, but cannot override Global Off. Manual uploads are never rate-limited. Changes take effect immediately on running cameras.</p>
+          </div>
+          <p class="hint">Images stay on this server in <code>data/review/</code>; delete ones you do not want retained. Do not collect footage without permission.</p>
+          <p id="review-summary" class="hint" role="status"></p>
+          <div class="form-row review-controls">
+            <div class="form-group"><label for="review-camera">Camera</label><select id="review-camera"><option value="">All cameras</option></select></div>
+            <div class="form-group"><label for="review-label-filter">Status</label><select id="review-label-filter"><option value="">All labels</option><option value="unreviewed">Needs review</option><option value="calling">Calling</option><option value="looking">Looking</option><option value="no_use">No phone use</option><option value="no_person">No person</option><option value="unclear">Unclear</option></select></div>
+          </div>
+          <div id="review-list" class="review-grid"><div class="empty-state">No samples yet.</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>Add missed cases</h2></div>
+          <p class="hint">Upload a person crop, or a short clip (up to 20 seconds / 30 MB). Clips contribute up to eight 1-second snapshots. For full scenes, draw a box around <b>one person</b> on each snapshot before labeling. To label a second person in the same frame, upload the image again. Include non-use too.</p>
+          <form id="review-upload-form" class="form-row review-controls">
+            <div class="form-group"><label for="review-upload-camera">Camera</label><select id="review-upload-camera" required></select></div>
+            <div class="form-group"><label for="review-file">Image or short clip</label><input id="review-file" type="file" accept="image/jpeg,image/png,video/mp4,video/quicktime,video/x-msvideo" required></div>
+            <button id="review-upload" class="btn btn-primary" type="submit">Add to review</button>
+          </form>
+          <p class="hint">No person and Unclear are excluded from binary phone-use training. Labeling alone does not change the running detector. Training needs at least 20 use and 20 no-use images, with separate camera-day groups containing both classes. Stop live cameras before training or switching models.</p>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>Train &amp; validate</h2></div>
+          <p class="hint">Train an ImageNet-pretrained MobileNetV2 classification head on reviewed person crops or saved person boxes. Validation holds out entire camera-days and compares against the current base model at the same threshold. Image-level results are not proof of event-level recall.</p>
+          <div id="training-report" class="hint" role="status">No training run yet.</div>
+          <div class="telegram-actions">
+            <button id="training-start" type="button" class="btn btn-primary">Train candidate</button>
+            <button id="training-deploy" type="button" class="btn btn-outline" hidden>Deploy validated candidate</button>
+            <button id="training-rollback" type="button" class="btn btn-outline" hidden>Roll back to original</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ Telegram ============ -->
+      <section id="view-telegram" class="view" hidden>
+        <div class="grid-2">
+          <div class="card" data-admin-only>
+            <div class="card-header">
+              <div>
+                <h2>Telegram</h2>
+                <p class="hint">Phone-use snapshots are sent to a Telegram group. Only group administrators can confirm or reject them.</p>
+              </div>
+              <span id="telegram-status" class="chip chip-idle">Not configured</span>
+            </div>
+            <div id="telegram-alert" class="alert alert-warning" hidden></div>
+            <div id="telegram-result" class="telegram-result" role="status"
+                 aria-live="polite" tabindex="-1" hidden></div>
+
+            <div class="form-group">
+              <label for="telegram-token">Bot token</label>
+              <input id="telegram-token" type="password" autocomplete="off" spellcheck="false"
+                     placeholder="123456789:AA…">
+              <span id="telegram-token-hint" class="hint">Create a bot with @BotFather, then paste its token here.</span>
+            </div>
+            <div class="form-group">
+              <label for="telegram-chat">Group ID</label>
+              <input id="telegram-chat" autocomplete="off" spellcheck="false"
+                     placeholder="-1001234567890 or -123456789">
+              <span class="hint">Group IDs are negative: -100… for supergroups, -… for older groups. A positive number is a user ID. Public supergroups may use @name.</span>
+            </div>
+
+            <div class="telegram-actions">
+              <button id="telegram-save" class="btn btn-primary">Save settings</button>
+              <button id="telegram-test" class="btn btn-outline">Verify connection</button>
+              <button id="telegram-clear" class="btn btn-outline">Disconnect</button>
+            </div>
+            <p class="hint telegram-note">The bot must be a member of the group and promoted to <b>administrator</b>, otherwise Confirm/Reject cannot be verified.</p>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2>Events <span id="event-count" class="count-pill">0</span></h2>
+                <p class="hint">Phone-use and entrance/exit incidents. Unconfirmed events are marked <b>Not confirmed</b>.</p>
+              </div>
+              <button class="btn-mini" data-action="refresh-events">Refresh</button>
+            </div>
+            <div id="events" class="events-list">
+              <div class="empty-state empty-state-sm">No events yet.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ Cameras ============ -->
+      <section id="view-cameras" class="view" hidden>
+        <div class="grid-2">
+          <div class="card" data-admin-only>
+            <div class="card-header">
+              <h2>Camera Setup</h2>
+            </div>
+
+            <div class="setup-actions">
+              <details class="discover-advanced">
+                <summary>Advanced scan options</summary>
+                <div class="form-group">
+                  <label for="discover-subnets">Extra subnets or hosts (optional)</label>
+                  <input id="discover-subnets" autocomplete="off"
+                         placeholder="192.168.1.0/24, 10.0.0.12">
+                  <small class="hint">Comma separated. Every local interface and
+                    route is scanned automatically; add these only for another
+                    network or a specific device.</small>
+                </div>
+                <label class="check-row">
+                  <input id="discover-deep" type="checkbox">
+                  Deep scan — all 65,535 TCP ports on responsive hosts (slow)
+                </label>
+              </details>
+              <button id="discover" class="btn btn-primary btn-block" data-action="discover">
+                🔍 Discover NVR &amp; Camera
+              </button>
+              <p class="hint">Scans every local network with WS-Discovery, SSDP,
+                ONVIF and RTSP without submitting credentials. Choose a device
+                below to enter its login.</p>
+              <div id="discover-summary" class="discover-summary" hidden></div>
+            </div>
+
+            <div id="discovered-panel" class="discovered-panel" hidden>
+              <b id="discovered-name"></b>
+              <p class="hint" id="discovered-detail"></p>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="discovered-user">Device username</label>
+                  <input id="discovered-user" autocomplete="username">
+                </div>
+                <div class="form-group">
+                  <label for="discovered-pass">Device password</label>
+                  <input id="discovered-pass" type="password" autocomplete="current-password">
+                </div>
+              </div>
+              <button id="connect-discovered" class="btn btn-primary btn-block"
+                      data-action="add-camera">Connect &amp; Add</button>
+            </div>
+
+            <div class="manual-add">
+              <input id="manual-url" placeholder="rtsp://… or http://…/video" autocomplete="off"
+                     aria-label="Camera stream URL">
+              <button id="add-manual" class="btn btn-outline" data-action="add-url">Add URL</button>
+            </div>
+
+            <div id="no-selection" class="empty-state empty-state-sm">
+              Select a camera from the list to configure and run it.
+            </div>
+
+            <div id="selected-panel" hidden>
+              <div class="selected-head">
+                <div class="selected-info">
+                  <b id="selected-name" class="truncate"></b>
+                  <small id="selected-address" class="truncate"></small>
+                </div>
+                <span id="run-status" class="chip chip-idle">Stopped</span>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="device-select">Device (compute)</label>
+                  <select id="device-select">
+                    <option value="auto">Auto (recommended)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="fps">FPS limit</label>
+                  <input id="fps" type="number" value="10" min="1" max="60">
+                </div>
+              </div>
+
+              <div id="creds" class="form-row" hidden>
+                <div class="form-group">
+                  <label for="onvif-user">ONVIF username</label>
+                  <input id="onvif-user" autocomplete="username">
+                </div>
+                <div class="form-group">
+                  <label for="onvif-pass">ONVIF password</label>
+                  <input id="onvif-pass" type="password" autocomplete="current-password">
+                </div>
+              </div>
+
+              <button id="find-feeds" class="btn btn-outline btn-block" data-action="check-feeds" hidden>
+                Check feeds with these credentials
+              </button>
+              <div id="channels" class="channel-list" hidden></div>
+
+              <button id="run" class="btn btn-success btn-block" data-action="toggle-run">Run CV Model</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2>Cameras <span id="camera-count" class="count-pill">0</span></h2>
+            </div>
+            <div class="filter-row">
+              <input id="camera-filter" class="filter-input" placeholder="Filter by name or address"
+                     autocomplete="off" aria-label="Filter cameras">
+            </div>
+            <div id="results" class="device-list">
+              <div class="empty-state">No cameras yet. Click Discover or add a URL.</div>
+            </div>
           </div>
         </div>
 
-        <div class="card enroll-card">
+        <div class="card detection-settings" data-admin-only>
+          <div class="card-header"><div>
+            <h2>Detection controls</h2>
+            <p class="hint">Pause analysis without disconnecting the camera feed.</p>
+          </div></div>
+          <div class="review-scope" role="group" aria-label="Detection setting scope">
+            <label class="check-row"><input id="detect-scope-global" name="detect-scope" type="radio" value="global" checked>Global · all cameras</label>
+            <label class="check-row"><input id="detect-scope-exclusive" name="detect-scope" type="radio" value="exclusive">Exclusive · selected cameras</label>
+          </div>
+          <div id="detect-cameras" class="review-capture-cameras" hidden></div>
+          <div class="review-scope">
+            <label class="check-row"><input id="detect-person" type="checkbox" checked>Person detection</label>
+            <label class="check-row"><input id="detect-phone" type="checkbox" checked>Phone-use detection</label>
+            <button id="detect-save" type="button" class="btn btn-primary">Save detection settings</button>
+          </div>
+          <p class="hint">Person detection Off also pauses face recognition, entrance/exit alerts and phone-use detection. Phone-use Off leaves persons, faces and crossing alerts active. Global Off takes precedence over Exclusive On. Saving Global settings clears Exclusive overrides. Changes apply immediately to running cameras.</p>
+          <div id="detect-effective" class="detection-effective" role="status"></div>
+        </div>
+
+        <div class="card">
           <div class="card-header">
-            <h2>People (Face Recognition)</h2>
-            <button id="enroll-person" class="btn btn-primary">+ Enroll Person</button>
+            <div>
+              <h2>Live Analytics Feed</h2>
+              <p class="hint">People and recognised faces are drawn on the live stream.</p>
+            </div>
+          </div>
+          <div id="feeds" class="feeds-grid">
+            <div class="empty-state empty-state-sm">No active streams. Select a camera and click Run CV Model.</div>
+          </div>
+        </div>
+
+        <div class="card" data-admin-only>
+          <div class="card-header">
+            <h2>Activity log</h2>
+            <button class="btn-mini" data-action="clear-log">Clear</button>
+          </div>
+          <pre id="log" class="log-panel" aria-live="polite"></pre>
+        </div>
+      </section>
+
+      <!-- ============ Enrollment ============ -->
+      <section id="view-enrollment" class="view" hidden>
+        <div id="face-engine-alert" class="alert alert-warning" hidden></div>
+
+        <div class="card" data-admin-only>
+          <div class="card-header"><div>
+            <h2>Unrecognised face review <span id="face-candidate-count" class="count-pill">0</span></h2>
+            <p class="hint">Opt-in: keep clear face crops that were detected but did not match an enrolled person. Nothing is enrolled automatically.</p>
+          </div><button id="face-review-refresh" class="btn-mini" type="button">Refresh</button></div>
+          <div class="review-scope" role="group" aria-label="Unrecognised face capture scope">
+            <label class="check-row"><input id="face-review-global" name="face-review-scope" type="radio" checked>Global · all cameras</label>
+            <label class="check-row"><input id="face-review-exclusive" name="face-review-scope" type="radio">Exclusive · selected cameras</label>
+          </div>
+          <div id="face-review-cameras" class="review-capture-cameras" hidden></div>
+          <div class="form-row review-controls">
+            <label class="check-row"><input id="face-review-enabled" type="checkbox">Capture unrecognised faces</label>
+            <div class="form-group"><label for="face-review-rate">Maximum new images per camera per rolling hour</label>
+              <select id="face-review-rate"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5">5</option><option value="custom">Custom</option></select></div>
+            <div id="face-review-custom-group" class="form-group" hidden>
+              <label for="face-review-custom">Custom maximum (1–30)</label>
+              <input id="face-review-custom" type="number" min="1" max="30" step="1" value="2">
+            </div>
+            <button id="face-review-save" type="button" class="btn btn-primary">Save capture settings</button>
+          </div>
+          <p class="hint">Off by default. Global Off stops capture everywhere; Global changes clear Exclusive overrides. Person detection and the face engine must be active. Candidates are rate-limited, deduplicated, and capped at 300 stored images. Deleting a candidate does not reset its hourly count. Face images stay on this server until assigned or discarded.</p>
+          <div id="face-review-effective" class="detection-effective" role="status"></div>
+          <div id="face-review-list" class="review-grid"><div class="empty-state">No unrecognised face candidates yet.</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Enrolled People <span id="person-count" class="count-pill">0</span></h2>
+              <p class="hint">Upload clear photos or a short video of each person. Front-facing, well-lit faces work best.</p>
+            </div>
+            <button class="btn btn-primary" data-action="enroll" data-needs-face data-admin-only>+ Enroll Person</button>
+          </div>
+          <div class="filter-row">
+            <input id="person-filter" class="filter-input" placeholder="Filter people"
+                   autocomplete="off" aria-label="Filter people">
           </div>
           <div id="persons" class="persons-list">
             <div class="empty-state">No enrolled people yet.</div>
           </div>
         </div>
+      </section>
 
-        <div class="card feeds-card">
+      <!-- ============ Attendance ============ -->
+      <section id="view-attendance" class="view" hidden>
+        <div class="attendance-summary" id="attendance-summary" role="status"></div>
+
+        <div class="card">
           <div class="card-header">
-            <h2>Live Analytics Feed</h2>
+            <div>
+              <h2>Attendance <span id="attendance-count" class="count-pill">0</span></h2>
+              <p class="hint">Built from entrance and exit crossings confirmed by a Telegram group administrator. Only enrolled people appear here; unknown crossings are saved below but never change attendance.</p>
+            </div>
+            <button class="btn-mini" data-action="refresh-attendance">Refresh</button>
           </div>
-          <div id="feeds" class="feeds-grid">
-            <div class="empty-state">No active streams. Select a camera and click Run.</div>
+          <div class="attendance-table-wrap">
+            <table class="attendance-table">
+              <thead>
+                <tr>
+                  <th scope="col">Person</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Last entrance</th>
+                  <th scope="col">Last exit</th>
+                  <th scope="col">Today</th>
+                </tr>
+              </thead>
+              <tbody id="attendance-rows">
+                <tr><td colspan="5"><div class="empty-state empty-state-sm">No enrolled people yet.</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="hint">Confirm an entrance/exit alert in Telegram to add its record. If the model showed <b>Unknown</b> but the person is enrolled, choose <b>Specify person</b> before confirming. Confirming an unknown crossing saves the event but leaves the table unchanged.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Unassigned crossings <span id="attendance-unknown-count" class="count-pill">0</span></h2>
+              <p class="hint">Confirmed entrance/exit events that were not linked to an enrolled person. They are kept for review and do not affect attendance.</p>
+            </div>
+          </div>
+          <div id="attendance-unknown" class="events-list">
+            <div class="empty-state empty-state-sm">No unassigned crossings.</div>
           </div>
         </div>
-      </div>
 
-      <pre id="log" class="log-panel"></pre>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Recent attendance</h2>
+              <p class="hint">The latest confirmed entrance/exit records assigned to enrolled people.</p>
+            </div>
+          </div>
+          <div id="attendance-log" class="attendance-log">
+            <div class="empty-state empty-state-sm">No attendance records yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ Customers ============ -->
+      <section id="view-customers" class="view" hidden>
+        <div id="customers-summary" class="attendance-summary" role="status"></div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Customers <span id="customers-count" class="count-pill">0</span></h2>
+              <p class="hint">Entrance/exit crossings from cameras marked <b>Count as Customer</b>. Unconfirmed events are shown too, labelled <b>Not confirmed</b>.</p>
+            </div>
+            <button class="btn-mini" data-action="refresh-customers" type="button">Refresh</button>
+          </div>
+          <div class="form-row review-controls">
+            <div class="form-group">
+              <label for="customer-status-filter">Status</label>
+              <select id="customer-status-filter">
+                <option value="all">All customer events</option>
+                <option value="pending">Not confirmed</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="rejected">Rejected</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+          </div>
+          <div id="customers-events" class="events-list">
+            <div class="empty-state empty-state-sm">No customer events yet.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h2>Counting customers</h2></div>
+          <p class="hint">Open a camera, assign an <b>Entrance</b> or <b>Exit</b> role, and tick <b>Count as Customer</b> before saving. Every crossing in the configured direction is then tagged as a customer event and appears here immediately. Confirmed customer entrances are counted as customers in the Overview; pending crossings are listed separately as <b>Not confirmed</b>. Removing the role also disables the customer flag.</p>
+        </div>
+      </section>
+
+      <!-- ============ Accounts ============ -->
+      <section id="view-accounts" class="view" data-admin-only hidden>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Accounts <span id="account-count" class="count-pill">0</span></h2>
+              <p class="hint">Create administrator or read-only accounts, set or reset
+                passwords, disable access, and unlock accounts locked after failed
+                sign-ins. Only administrators can see this section.</p>
+            </div>
+            <button id="account-add" class="btn btn-primary" type="button">+ Add account</button>
+          </div>
+          <div id="accounts-list" class="device-list">
+            <div class="empty-state">Loading accounts…</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h2>Sign-in protection</h2></div>
+          <p class="hint">Passwords are stored as salted PBKDF2 hashes and are never
+            shown again. Sessions use an HttpOnly cookie and can be ended with
+            <b>Sign out</b>. An account locks after three consecutive wrong
+            passwords; use <b>Unlock</b> here to let that person try again.
+            Disabling an account also ends its active sessions immediately.</p>
+        </div>
+      </section>
     </main>
   </div>
 
-  <!-- Edit camera modal -->
-  <div id="edit-modal" class="modal" hidden>
-    <div class="modal-content">
-      <h2>Edit Camera</h2>
-      <div class="form-group"><label>Name</label><input id="edit-name"></div>
-      <div class="form-group"><label>Address</label><input id="edit-address"></div>
-      <div class="form-group"><label>RTSP URL (leave empty to resolve via ONVIF)</label><input id="edit-rtsp"></div>
+  <!-- ============ Edit camera ============ -->
+  <div id="camera-modal" class="modal" hidden>
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="camera-modal-title">
+      <div class="modal-head">
+        <h2 id="camera-modal-title">Edit camera</h2>
+        <button class="icon-btn" data-close="camera-modal" aria-label="Close">✕</button>
+      </div>
+
+      <div class="form-group"><label for="edit-name">Name</label><input id="edit-name"></div>
+      <div class="form-group"><label for="edit-address">Address</label><input id="edit-address"></div>
       <div class="form-group">
-        <label>Source Type</label>
+        <label for="edit-rtsp">RTSP URL <span class="optional">(leave empty to resolve via ONVIF)</span></label>
+        <input id="edit-rtsp">
+      </div>
+      <div class="form-group">
+        <label for="edit-source">Source type</label>
         <select id="edit-source">
           <option value="onvif">ONVIF</option>
           <option value="mobile">Mobile / MJPEG</option>
           <option value="manual-rtsp">Manual RTSP</option>
         </select>
       </div>
-      <div class="form-group"><label>ONVIF Username</label><input id="edit-user"></div>
-      <div class="form-group"><label>ONVIF Password</label><input id="edit-pass" type="password"></div>
-      <div class="form-group">
-        <label>Default Device</label>
-        <select id="edit-device"></select>
+      <div class="form-row">
+        <div class="form-group"><label for="edit-user">ONVIF username</label><input id="edit-user" autocomplete="username"></div>
+        <div class="form-group"><label for="edit-pass">ONVIF password</label><input id="edit-pass" type="password" autocomplete="current-password"></div>
       </div>
-      <div class="form-group"><label>Default FPS</label><input id="edit-fps" type="number" min="1" max="30"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="edit-device">Default device</label>
+          <select id="edit-device"></select>
+        </div>
+        <div class="form-group"><label for="edit-fps">Default FPS</label><input id="edit-fps" type="number" min="1" max="60"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="edit-phone-conf">Phone sensitivity <span class="optional">(0.02-0.95)</span></label>
+          <input id="edit-phone-conf" type="number" min="0.02" max="0.95" step="0.01">
+        </div>
+        <div class="form-group">
+          <label for="edit-phone-pitch">Look-down threshold <span class="optional">(0.1-0.95)</span></label>
+          <input id="edit-phone-pitch" type="number" min="0.1" max="0.95" step="0.01">
+        </div>
+      </div>
+      <p class="hint">Lower phone sensitivity finds smaller or darker phones but lets more false positives through. A lower look-down threshold counts a slighter head tilt as looking at a phone.</p>
+
+      <div class="camera-role-editor">
+        <h3>Assign a role</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="edit-role">Camera role</label>
+            <select id="edit-role"><option value="">No role</option>
+              <option value="entrance">Entrance · entered</option>
+              <option value="exit">Exit · left</option></select>
+          </div>
+          <div class="form-group">
+            <label for="edit-tripwire-direction">Crossing direction</label>
+            <select id="edit-tripwire-direction">
+              <option value="positive_to_negative">Yellow side → Blue side</option>
+              <option value="negative_to_positive">Blue side → Yellow side</option>
+            </select>
+          </div>
+        </div>
+        <label id="edit-count-customer-row" class="check-row">
+          <input id="edit-count-customer" type="checkbox">
+          Count as Customer — include this camera's entrance/exit crossings in the Customers section
+        </label>
+        <p class="hint">Draw a line from A to B across the doorway. Coloured markers and the green arrow show which crossing direction will alert. The person's feet must cross the drawn segment. Opposite-direction crossings are ignored.</p>
+        <button id="edit-line-load" class="btn btn-outline" type="button">Load camera frame to draw line</button>
+        <div id="edit-line-area" hidden>
+          <canvas id="edit-line-canvas" aria-label="Camera frame for drawing a crossing line"></canvas>
+          <p id="edit-line-status" class="hint" role="status"></p>
+          <button id="edit-line-clear" class="btn-mini" type="button">Clear line</button>
+        </div>
+        <p id="edit-line-pending" class="hint" hidden>Saved line exists. Load a camera frame to inspect or redraw it.</p>
+      </div>
+
       <div class="modal-actions">
-        <button id="edit-cancel" class="btn btn-outline">Cancel</button>
-        <button id="edit-save" class="btn btn-primary">Save</button>
+        <button class="btn btn-outline" data-close="camera-modal">Cancel</button>
+        <button id="edit-save" class="btn btn-primary">Save changes</button>
       </div>
     </div>
   </div>
 
-    <!-- Enroll person modal -->
-  <div id="enroll-modal" class="modal" hidden>
-    <div class="modal-content">
-      <h2>Enroll Person</h2>
+  <!-- ============ Enroll / edit person ============ -->
+  <div id="person-modal" class="modal" hidden>
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="person-modal-title">
+      <div class="modal-head">
+        <h2 id="person-modal-title">Enroll person</h2>
+        <button class="icon-btn" data-close="person-modal" aria-label="Close">✕</button>
+      </div>
+      <p id="person-modal-hint" class="hint"></p>
+
       <div class="form-group">
-        <label>Name</label>
-        <input id="enroll-name" placeholder="Full name">
+        <label for="person-name">Name</label>
+        <input id="person-name" placeholder="Full name" autocomplete="name">
       </div>
       <div class="form-group">
-        <label>Notes (optional)</label>
-        <textarea id="enroll-notes" rows="2"></textarea>
+        <label for="person-notes">Notes <span class="optional">(optional)</span></label>
+        <textarea id="person-notes" rows="2" placeholder="e.g. Delivery driver, neighbour…"></textarea>
       </div>
-      <div class="form-group">
-        <label>Images / videos (one clear face per image or frame)</label>
-        <input id="enroll-files" type="file" multiple accept="image/*,video/*">
+      <div id="person-files-group" class="form-group">
+        <label id="person-file-label">Photos / videos</label>
+        <div id="person-drop" class="dropzone" tabindex="0" role="button"
+             aria-label="Add photos or videos">
+          <input id="person-files" type="file" multiple accept="image/*,video/*" hidden>
+          <div class="dropzone-icon" aria-hidden="true">📷</div>
+          <div class="dropzone-title">Drop files here or click to browse</div>
+          <div class="dropzone-hint">JPG, PNG, HEIC · MP4, MOV, MKV</div>
+        </div>
+        <ul id="person-file-list" class="file-list"></ul>
       </div>
-      <div id="enroll-status" class="enroll-status"></div>
+
+      <div id="person-status" class="form-status" role="status"></div>
+
       <div class="modal-actions">
-        <button id="enroll-cancel" class="btn btn-outline">Cancel</button>
-        <button id="enroll-submit" class="btn btn-primary">Enroll</button>
+        <button class="btn btn-outline" data-close="person-modal">Cancel</button>
+        <button id="person-submit" class="btn btn-primary">Enroll</button>
       </div>
     </div>
   </div>
+
+  <!-- ============ Annotate one person in a review sample ============ -->
+  <div id="review-box-modal" class="modal" hidden>
+    <div class="modal-content review-box-modal" role="dialog" aria-modal="true" aria-labelledby="review-box-title">
+      <div class="modal-head">
+        <h2 id="review-box-title">Draw person box</h2>
+        <button class="icon-btn" data-close="review-box-modal" aria-label="Close">✕</button>
+      </div>
+      <p class="hint">Drag from one corner to the opposite corner around the person whose activity you are labeling. This crops the image for binary phone-use training; it does not train a bounding-box phone detector.</p>
+      <canvas id="review-box-canvas" aria-label="Image for drawing one person box"></canvas>
+      <p id="review-box-coordinates" class="hint" role="status">No box. Draw a rectangle to select a person.</p>
+      <div class="modal-actions">
+        <button id="review-box-clear" class="btn btn-outline" type="button">Clear box</button>
+        <button class="btn btn-outline" type="button" data-close="review-box-modal">Cancel</button>
+        <button id="review-box-save" class="btn btn-primary" type="button">Save box</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Confirm ============ -->
+  <!-- ============ Account editor ============ -->
+  <div id="account-modal" class="modal" hidden>
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="account-modal-title">
+      <div class="modal-head">
+        <h2 id="account-modal-title">Add account</h2>
+        <button class="icon-btn" data-close="account-modal" aria-label="Close">✕</button>
+      </div>
+      <input id="account-id" type="hidden">
+      <div class="form-group">
+        <label for="account-username">Username</label>
+        <input id="account-username" autocomplete="off" maxlength="32"
+               placeholder="e.g. reception">
+        <small class="hint">3–32 characters: letters, numbers, dot, dash or underscore.</small>
+      </div>
+      <div class="form-group">
+        <label for="account-role">Role</label>
+        <select id="account-role">
+          <option value="reader">Reader — view dashboards only</option>
+          <option value="admin">Administrator — full access</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="account-password">Password</label>
+        <input id="account-password" type="password" autocomplete="new-password"
+               maxlength="256" placeholder="At least 4 characters">
+        <small id="account-password-hint" class="hint">Set the initial password for this account.</small>
+      </div>
+      <label class="check-row">
+        <input id="account-active" type="checkbox" checked>
+        Account enabled
+      </label>
+      <p id="account-modal-note" class="account-note"></p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" type="button" data-close="account-modal">Cancel</button>
+        <button id="account-save" class="btn btn-primary" type="button">Save account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Change own password ============ -->
+  <div id="password-modal" class="modal" hidden>
+    <div class="modal-content modal-sm" role="dialog" aria-modal="true" aria-labelledby="password-modal-title">
+      <div class="modal-head">
+        <h2 id="password-modal-title">Change password</h2>
+        <button class="icon-btn" data-close="password-modal" aria-label="Close">✕</button>
+      </div>
+      <div class="form-group">
+        <label for="current-password">Current password</label>
+        <input id="current-password" type="password" autocomplete="current-password" maxlength="256">
+      </div>
+      <div class="form-group">
+        <label for="new-password">New password</label>
+        <input id="new-password" type="password" autocomplete="new-password" maxlength="256">
+      </div>
+      <div class="form-group">
+        <label for="confirm-password">Confirm new password</label>
+        <input id="confirm-password" type="password" autocomplete="new-password" maxlength="256">
+      </div>
+      <div id="password-error" class="alert alert-error" role="alert" hidden></div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" type="button" data-close="password-modal">Cancel</button>
+        <button id="password-save" class="btn btn-primary" type="button">Update password</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirm-modal" class="modal" hidden>
+    <div class="modal-content modal-sm" role="alertdialog" aria-modal="true"
+         aria-labelledby="confirm-title" aria-describedby="confirm-text">
+      <div class="modal-head">
+        <h2 id="confirm-title">Are you sure?</h2>
+      </div>
+      <p id="confirm-text" class="confirm-text"></p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="confirm-cancel">Cancel</button>
+        <button class="btn btn-danger" id="confirm-ok">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts" class="toast-container" aria-live="polite"></div>
 
   <script src="/app.js"></script>
 </body>

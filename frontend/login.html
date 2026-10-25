@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Sign in · CCTV CV</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="login-page">
+  <main class="login-card">
+    <div class="login-brand">
+      <div class="logo-icon" aria-hidden="true">⚡</div>
+      <div>
+        <h1>CCTV CV</h1>
+        <p>Sign in to the monitoring dashboard</p>
+      </div>
+    </div>
+
+    <form id="login-form" novalidate>
+      <div class="form-group">
+        <label for="login-username">Username</label>
+        <input id="login-username" name="username" autocomplete="username"
+               value="admin" maxlength="32" required autofocus>
+      </div>
+      <div class="form-group">
+        <label for="login-password">Password</label>
+        <input id="login-password" name="password" type="password"
+               autocomplete="current-password" maxlength="256" required>
+      </div>
+
+      <div id="login-error" class="alert alert-error" role="alert" hidden></div>
+
+      <button id="login-submit" class="btn btn-primary btn-block" type="submit">
+        Sign in
+      </button>
+    </form>
+
+    <p class="login-note">
+      Access is logged. Accounts lock automatically after three consecutive
+      wrong passwords and must be unlocked by an administrator.
+    </p>
+  </main>
+
+  <script src="/login.js"></script>
+</body>
+</html>
