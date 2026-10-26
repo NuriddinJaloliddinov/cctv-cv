@@ -996,6 +996,39 @@ def get_event(event_id: str) -> dict | None:
     return _row_to_event(row) if row else None
 
 
+def delete_event(event_id: str) -> dict | None:
+    """Remove an event and any attendance derived from it in one transaction."""
+    with _cursor() as conn:
+        row = conn.execute(
+            "SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
+        if row is None:
+            return None
+        conn.execute("DELETE FROM attendance WHERE event_id = ?", (event_id,))
+        conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
+    return _row_to_event(row)
+
+
+def delete_events_in_scope(scope: str) -> list[dict]:
+    """Delete a dashboard category and its linked attendance atomically."""
+    where = {
+        "unassigned": "e.status = 'confirmed' AND e.kind IN ('entered', 'left') "
+                      "AND a.id IS NULL",
+        "attendance": "a.id IS NOT NULL",
+        "customers": "e.customer = 1",
+        "telegram": "1 = 1",
+    }[scope]
+    with _cursor() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT e.* FROM events e "
+            "LEFT JOIN attendance a ON a.event_id = e.id WHERE " + where
+        ).fetchall()
+        ids = [(row["id"],) for row in rows]
+        if ids:
+            conn.executemany("DELETE FROM attendance WHERE event_id = ?", ids)
+            conn.executemany("DELETE FROM events WHERE id = ?", ids)
+    return [_row_to_event(row) for row in rows]
+
+
 def update_event(event_id: str, patch: dict) -> dict | None:
     sets, vals = [], []
     for key, value in patch.items():
@@ -1361,4 +1394,3 @@ def dashboard_overview(limit: int = 8) -> dict:
         "recent_customers": list_events(None, limit=limit, customer=True),
         "recent_attendance": [dict(row) for row in recent_attendance],
     }
-

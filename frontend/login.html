@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex">
   <title>Sign in · CCTV CV</title>
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css?v=4">
 </head>
 <body class="login-page">
   <main class="login-card">
@@ -15,6 +15,14 @@
         <h1>CCTV CV</h1>
         <p>Sign in to the monitoring dashboard</p>
       </div>
+    </div>
+    <div class="login-language language-control">
+      <label for="login-language">Language / Язык / Til</label>
+      <select id="login-language" data-language-switch aria-label="Dashboard language">
+        <option value="en">English</option>
+        <option value="ru">Русский</option>
+        <option value="uz">O‘zbekcha</option>
+      </select>
     </div>
 
     <form id="login-form" novalidate>
@@ -42,6 +50,7 @@
     </p>
   </main>
 
-  <script src="/login.js"></script>
+  <script src="/i18n.js?v=1"></script>
+  <script src="/login.js?v=2"></script>
 </body>
 </html>

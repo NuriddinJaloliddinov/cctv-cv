@@ -5,6 +5,10 @@ const errorBox = document.getElementById('login-error');
 const submit = document.getElementById('login-submit');
 const usernameInput = document.getElementById('login-username');
 const passwordInput = document.getElementById('login-password');
+document.title = `${window.dashboardI18n.t('Sign in')} · CCTV CV`;
+window.addEventListener('dashboard-language-change', () => {
+  document.title = `${window.dashboardI18n.t('Sign in')} · CCTV CV`;
+});
 
 function safeNext() {
   const value = new URLSearchParams(location.search).get('next') || '/';

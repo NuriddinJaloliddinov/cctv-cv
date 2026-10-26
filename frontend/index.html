@@ -5,16 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
   <title>CCTV CV</title>
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css?v=5">
 </head>
 <body>
   <div class="app-container">
-    <aside class="sidebar">
-      <div class="logo">
-        <div class="logo-icon">⚡</div>
-        <span>CCTV CV</span>
+    <aside class="sidebar" id="app-sidebar" aria-label="Main navigation">
+      <div class="sidebar-head">
+        <div class="logo">
+          <div class="logo-icon">⚡</div>
+          <span>CCTV CV</span>
+        </div>
+        <button id="sidebar-close" class="sidebar-close" type="button" aria-label="Close menu">✕</button>
       </div>
-      <nav class="nav-links" aria-label="Sections">
+      <nav class="nav-links" id="sidebar-nav" aria-label="Sections">
         <a href="#/dashboard" class="nav-link" data-view="dashboard">
           <span class="nav-icon" aria-hidden="true">🏠</span><span>Overview</span>
         </a>
@@ -30,6 +33,9 @@
         <a href="#/customers" class="nav-link" data-view="customers">
           <span class="nav-icon" aria-hidden="true">🛍️</span><span>Customers</span>
         </a>
+        <a href="#/server" class="nav-link" data-view="server" data-admin-only>
+          <span class="nav-icon" aria-hidden="true">🖥️</span><span>Server</span>
+        </a>
         <a href="#/training" class="nav-link" data-view="training" data-admin-only>
           <span class="nav-icon" aria-hidden="true">🏷️</span><span>Training</span>
         </a>
@@ -40,6 +46,14 @@
           <span class="nav-icon" aria-hidden="true">🔐</span><span>Accounts</span>
         </a>
       </nav>
+      <div class="language-control">
+        <label for="dashboard-language">Language / Язык / Til</label>
+        <select id="dashboard-language" data-language-switch aria-label="Dashboard language">
+          <option value="en">English</option>
+          <option value="ru">Русский</option>
+          <option value="uz">O‘zbekcha</option>
+        </select>
+      </div>
       <div class="user-profile">
         <div class="avatar" id="user-avatar">U</div>
         <div class="user-info">
@@ -52,11 +66,16 @@
         <button class="btn" id="logout" type="button">Sign out</button>
       </div>
     </aside>
+    <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true" hidden></div>
 
     <main class="main-content">
       <header class="top-bar">
+        <button id="sidebar-toggle" class="mobile-menu-toggle" type="button"
+                aria-label="Open menu" aria-controls="app-sidebar" aria-expanded="false">
+          <span class="menu-lines" aria-hidden="true"><span></span><span></span><span></span></span>
+        </button>
         <div class="page-heading">
-          <h1 id="page-title">Cameras</h1>
+          <h1 id="page-title" tabindex="-1">Cameras</h1>
           <p id="page-subtitle" class="page-subtitle">Add cameras, tune settings, and watch live analytics.</p>
         </div>
         <div class="top-actions">
@@ -233,7 +252,10 @@
                 <h2>Events <span id="event-count" class="count-pill">0</span></h2>
                 <p class="hint">Phone-use and entrance/exit incidents. Unconfirmed events are marked <b>Not confirmed</b>.</p>
               </div>
-              <button class="btn-mini" data-action="refresh-events">Refresh</button>
+              <div class="section-actions">
+                <button class="btn-mini btn-mini-danger" data-action="clear-events" data-scope="telegram" data-admin-only type="button">Delete all</button>
+                <button class="btn-mini" data-action="refresh-events">Refresh</button>
+              </div>
             </div>
             <div id="events" class="events-list">
               <div class="empty-state empty-state-sm">No events yet.</div>
@@ -482,6 +504,7 @@
               <h2>Unassigned crossings <span id="attendance-unknown-count" class="count-pill">0</span></h2>
               <p class="hint">Confirmed entrance/exit events that were not linked to an enrolled person. They are kept for review and do not affect attendance.</p>
             </div>
+            <button class="btn-mini btn-mini-danger" data-action="clear-events" data-scope="unassigned" data-admin-only type="button">Delete all</button>
           </div>
           <div id="attendance-unknown" class="events-list">
             <div class="empty-state empty-state-sm">No unassigned crossings.</div>
@@ -494,6 +517,7 @@
               <h2>Recent attendance</h2>
               <p class="hint">The latest confirmed entrance/exit records assigned to enrolled people.</p>
             </div>
+            <button class="btn-mini btn-mini-danger" data-action="clear-events" data-scope="attendance" data-admin-only type="button">Delete all</button>
           </div>
           <div id="attendance-log" class="attendance-log">
             <div class="empty-state empty-state-sm">No attendance records yet.</div>
@@ -511,7 +535,10 @@
               <h2>Customers <span id="customers-count" class="count-pill">0</span></h2>
               <p class="hint">Entrance/exit crossings from cameras marked <b>Count as Customer</b>. Unconfirmed events are shown too, labelled <b>Not confirmed</b>.</p>
             </div>
-            <button class="btn-mini" data-action="refresh-customers" type="button">Refresh</button>
+            <div class="section-actions">
+              <button class="btn-mini btn-mini-danger" data-action="clear-events" data-scope="customers" data-admin-only type="button">Delete all</button>
+              <button class="btn-mini" data-action="refresh-customers" type="button">Refresh</button>
+            </div>
           </div>
           <div class="form-row review-controls">
             <div class="form-group">
@@ -534,6 +561,36 @@
           <div class="card-header"><h2>Counting customers</h2></div>
           <p class="hint">Open a camera, assign an <b>Entrance</b> or <b>Exit</b> role, and tick <b>Count as Customer</b> before saving. Every crossing in the configured direction is then tagged as a customer event and appears here immediately. Confirmed customer entrances are counted as customers in the Overview; pending crossings are listed separately as <b>Not confirmed</b>. Removing the role also disables the customer flag.</p>
         </div>
+      </section>
+
+      <!-- ============ Server ============ -->
+      <section id="view-server" class="view" data-admin-only hidden>
+        <div class="card">
+          <div class="card-header"><div>
+            <h2>Server capacity</h2>
+            <p class="hint">Assess a proposed workload against this server. The 15-second check observes running cameras; it does not start streams or add test load.</p>
+          </div></div>
+          <form id="server-form">
+            <div class="server-fields">
+              <div class="form-group"><label for="server-cameras">Concurrent cameras</label><input id="server-cameras" type="number" min="1" max="256" value="4" required></div>
+              <div class="form-group"><label for="server-fps">Camera FPS</label><input id="server-fps" type="number" min="1" max="60" value="10" required></div>
+              <div class="form-group"><label for="server-width">Stream width (pixels)</label><input id="server-width" type="number" min="320" max="7680" value="1920" required></div>
+              <div class="form-group"><label for="server-height">Stream height (pixels)</label><input id="server-height" type="number" min="240" max="4320" value="1080" required></div>
+              <div class="form-group"><label for="server-people">People per frame at peak</label><input id="server-people" type="number" min="0" max="100" value="2" required></div>
+              <div class="form-group"><label for="server-viewers">Simultaneous live viewers</label><input id="server-viewers" type="number" min="0" max="100" value="1" required></div>
+              <div class="form-group"><label for="server-bitrate">Stream bitrate (Mbps/camera)</label><input id="server-bitrate" type="number" min="0.1" max="100" step="0.1" value="4" required></div>
+              <div class="form-group"><label for="server-snapshots">Estimated snapshots (MB/day total)</label><input id="server-snapshots" type="number" min="0" max="100000" step="0.1" value="100" required></div>
+              <div class="form-group"><label for="server-retention">Retention (days)</label><input id="server-retention" type="number" min="0" max="3650" value="30" required></div>
+            </div>
+            <div class="server-options">
+              <label class="check-row"><input id="server-phone" type="checkbox" checked>Phone-use detection (additional crop and tile passes)</label>
+              <label class="check-row"><input id="server-face" type="checkbox" checked>Faces expected in the scene (face analysis runs when people are detected)</label>
+            </div>
+            <p class="hint">Use the camera's actual stream resolution, bitrate and busiest expected scene. The application caps detection cadence separately from display FPS. Camera codec, viewer encoding, storage write speed and peak scene complexity may change capacity.</p>
+            <button id="server-check" class="btn btn-primary" type="submit">Check this server (15 seconds)</button>
+          </form>
+        </div>
+        <div class="card" id="server-results" role="status" aria-live="polite" hidden></div>
       </section>
 
       <!-- ============ Accounts ============ -->
@@ -787,6 +844,7 @@
 
   <div id="toasts" class="toast-container" aria-live="polite"></div>
 
-  <script src="/app.js"></script>
+  <script src="/i18n.js?v=1"></script>
+  <script src="/app.js?v=5"></script>
 </body>
 </html>

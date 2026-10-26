@@ -216,6 +216,9 @@ class Pipeline:
         self._box_shape = None
         self._box_at = 0.0
         self._inference_ms = 0.0
+        self._inference_count = 0
+        self._inference_times = deque(maxlen=200)
+        self._face_pass_count = 0
 
         # Per-track phone-use state machine (inference thread only).
         self._phone_tracks: dict[int, dict] = {}
@@ -297,8 +300,13 @@ class Pipeline:
         source = self._source.status()
         with self._box_lock:
             inference_ms = self._inference_ms
+            inference_count = self._inference_count
+            times = list(self._inference_times)
+            face_pass_count = self._face_pass_count
+            person_count = len(self._boxes)
             phones = len(self._phone_boxes)
             phone_use = sum(1 for kind in self._phone_use if kind)
+        _, raw = self._source.latest()
         with self._frame_lock:
             age = (time.monotonic() - self._published_at) * 1000 \
                 if self._published_at else None
@@ -307,6 +315,14 @@ class Pipeline:
             "publish_fps": round(self._publish_fps, 1),
             "frames_shown": self._frame_count,
             "inference_ms": round(inference_ms, 1),
+            "inference_count": inference_count,
+            "face_pass_count": face_pass_count,
+            "person_count": person_count,
+            "inference_p95_ms": round(sorted(times)[int(.95 * (len(times) - 1))], 1) if times else None,
+            "source_width": int(raw.shape[1]) if raw is not None else None,
+            "source_height": int(raw.shape[0]) if raw is not None else None,
+            "configured_fps": self.fps,
+            "device": self.device,
             "display_age_ms": round(age, 1) if age is not None else None,
             "phones": phones,
             "phone_use": phone_use,
@@ -397,6 +413,8 @@ class Pipeline:
                     faces, unknown_faces = identify(frame, boxes, with_unknown=True)
                 else:
                     faces = identify(frame, boxes)
+                with self._box_lock:
+                    self._face_pass_count += 1
                 last_face = now
 
             if not boxes:
@@ -511,6 +529,8 @@ class Pipeline:
                 self._box_shape = shape
                 self._box_at = time.monotonic()
                 self._inference_ms = elapsed_ms
+                self._inference_count += 1
+                self._inference_times.append(elapsed_ms)
 
     # ---------- phone-use state ----------
 

@@ -183,7 +183,11 @@ function closeModal(el) {
   el.hidden = true;
   openModals.delete(el);
   const target = modalFocus.get(el);
-  if (target?.isConnected) target.focus();
+  if (target?.isConnected) {
+    if (target.closest('.sidebar') && mobileSidebar.matches && !sidebarOpen) {
+      $('sidebar-toggle').focus();
+    } else target.focus();
+  }
 }
 
 let confirmResolve = null;
@@ -238,6 +242,82 @@ document.addEventListener('keydown', (e) => {
   if (confirmResolve) { settleConfirm(false); return; }
   const visible = [...openModals].filter((m) => !m.hidden).pop();
   if (visible) closeModal(visible);
+  else if (sidebarOpen) closeSidebar();
+});
+
+// The mobile navigation is a real drawer, not a horizontally scrolling menu.
+const mobileSidebar = window.matchMedia('(max-width: 820px)');
+const sidebar = $('app-sidebar');
+const sidebarToggle = $('sidebar-toggle');
+const sidebarBackdrop = $('sidebar-backdrop');
+let sidebarOpen = false;
+
+function closeSidebar({ restoreFocus = true } = {}) {
+  if (!sidebarOpen) return;
+  sidebarOpen = false;
+  document.body.classList.remove('sidebar-open');
+  sidebarToggle.setAttribute('aria-expanded', 'false');
+  sidebarBackdrop.hidden = true;
+  sidebar.inert = mobileSidebar.matches;
+  sidebar.removeAttribute('role');
+  sidebar.removeAttribute('aria-modal');
+  if (mobileSidebar.matches) sidebar.setAttribute('aria-hidden', 'true');
+  if (restoreFocus && mobileSidebar.matches) sidebarToggle.focus();
+}
+
+function openSidebar() {
+  if (!mobileSidebar.matches || sidebarOpen) return;
+  sidebarOpen = true;
+  sidebar.inert = false;
+  sidebar.removeAttribute('aria-hidden');
+  sidebar.setAttribute('role', 'dialog');
+  sidebar.setAttribute('aria-modal', 'true');
+  document.body.classList.add('sidebar-open');
+  sidebarToggle.setAttribute('aria-expanded', 'true');
+  sidebarBackdrop.hidden = false;
+  $('sidebar-close').focus();
+}
+
+function syncSidebar() {
+  const focusInside = sidebar.contains(document.activeElement);
+  closeSidebar({ restoreFocus: false });
+  sidebar.inert = mobileSidebar.matches;
+  if (mobileSidebar.matches) sidebar.setAttribute('aria-hidden', 'true');
+  else sidebar.removeAttribute('aria-hidden');
+  if (mobileSidebar.matches && focusInside) sidebarToggle.focus();
+}
+
+sidebarToggle.addEventListener('click', () => {
+  if (sidebarOpen) closeSidebar();
+  else openSidebar();
+});
+$('sidebar-close').addEventListener('click', () => closeSidebar());
+sidebarBackdrop.addEventListener('click', () => closeSidebar());
+sidebar.querySelectorAll('.nav-link').forEach((link) => {
+  link.addEventListener('click', () => {
+    if (!sidebarOpen) return;
+    closeSidebar({ restoreFocus: false });
+    setTimeout(() => $('page-title').focus(), 0);
+  });
+});
+sidebar.querySelector('.sidebar-account-actions').addEventListener('click', () => {
+  closeSidebar({ restoreFocus: false });
+});
+mobileSidebar.addEventListener('change', syncSidebar);
+syncSidebar();
+
+document.addEventListener('keydown', (e) => {
+  if (!sidebarOpen || e.key !== 'Tab' || [...openModals].some((m) => !m.hidden)) return;
+  const items = [...sidebar.querySelectorAll('a:not([hidden]), button:not(:disabled), select:not(:disabled)')]
+    .filter((el) => el.getClientRects().length && !el.closest('[hidden], [style*="display: none"]'));
+  if (!items.length) return;
+  if (e.shiftKey && document.activeElement === items[0]) {
+    e.preventDefault();
+    items.at(-1).focus();
+  } else if (!e.shiftKey && document.activeElement === items.at(-1)) {
+    e.preventDefault();
+    items[0].focus();
+  }
 });
 
 // ============================================================
@@ -265,6 +345,10 @@ const VIEWS = {
     title: 'Customers',
     subtitle: 'Customer-tagged entrance and exit events, including unconfirmed ones.',
   },
+  server: {
+    title: 'Server',
+    subtitle: 'Measure this server against a proposed camera workload.',
+  },
   training: {
     title: 'Training',
     subtitle: 'Review phone-use examples and collect missed cases.',
@@ -287,7 +371,7 @@ function viewFromHash() {
 function applyView({ scroll = true } = {}) {
   const view = viewFromHash();
 
-  if (!isAdminUser() && ['accounts', 'training'].includes(view)) {
+  if (!isAdminUser() && ['accounts', 'training', 'server'].includes(view)) {
     location.hash = '#/dashboard';
     return;
   }
@@ -306,7 +390,7 @@ function applyView({ scroll = true } = {}) {
 
   $('page-title').textContent = VIEWS[view].title;
   $('page-subtitle').textContent = VIEWS[view].subtitle;
-  document.title = `${VIEWS[view].title} · CCTV CV`;
+  document.title = `${window.dashboardI18n.t(VIEWS[view].title)} · CCTV CV`;
 
   if (view === 'cameras') {
     renderCameras();
@@ -369,7 +453,19 @@ function applyRoleUi() {
   if (typeof renderPersons === 'function') renderPersons();
 }
 
-window.addEventListener('hashchange', () => applyView());
+window.addEventListener('dashboard-language-change', () => {
+  const view = viewFromHash();
+  document.title = `${window.dashboardI18n.t(VIEWS[view].title)} · CCTV CV`;
+  if (overviewData) renderOverview();
+  if (attendance) renderAttendance();
+  if (customerData) renderCustomers();
+  if (events.length) renderEvents();
+});
+
+window.addEventListener('hashchange', () => {
+  closeSidebar({ restoreFocus: false });
+  applyView();
+});
 
 setInterval(() => {
   if (viewFromHash() === 'training') loadTrainingStatus();
@@ -2379,7 +2475,7 @@ function formatEventTime(value) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  return date.toLocaleString(window.dashboardI18n.locale);
 }
 
 function eventCard(event) {
@@ -2413,7 +2509,60 @@ function eventCard(event) {
       <small>${escapeHtml(formatEventTime(event.created_at))}</small>
       ${handled}
     </div>
+    ${isAdminUser() ? deleteEventButton(event.id) : ''}
   </div>`;
+}
+
+function deleteEventButton(id) {
+  return `<button type="button" class="btn-mini btn-mini-danger" data-action="delete-event"
+    data-id="${escapeHtml(id)}" aria-label="Delete event">Delete</button>`;
+}
+
+async function deleteEvent(id) {
+  if (!isAdminUser()) return;
+  if (!await confirmDialog({
+    title: 'Delete event?',
+    message: 'Permanently remove this event, its snapshot and any attendance record created from it? This cannot be undone.',
+    confirmLabel: 'Delete event',
+  })) return;
+  try {
+    await api(`/api/events/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    toast('Event deleted.', 'success');
+    await refreshEventViews();
+  } catch (e) {
+    if (e.status !== 401) toast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+function refreshEventViews() {
+  return Promise.all([loadOverview(), loadAttendance(), loadCustomers(), loadEvents()]);
+}
+
+const CLEAR_EVENT_LABELS = {
+  unassigned: 'unassigned crossings',
+  attendance: 'attendance records',
+  customers: 'customer events',
+  telegram: 'all Telegram events',
+};
+
+async function clearEvents(scope, btn) {
+  if (!isAdminUser() || !Object.hasOwn(CLEAR_EVENT_LABELS, scope)) return;
+  const label = CLEAR_EVENT_LABELS[scope];
+  if (!await confirmDialog({
+    title: `Delete ${label}?`,
+    message: `Permanently delete ${label}, their snapshots and any linked attendance? Events shown in other dashboard sections will disappear there too. This cannot be undone.`,
+    confirmLabel: 'Delete all',
+  })) return;
+  setBusy(btn, true, 'Deleting…');
+  try {
+    const result = await api(`/api/events?scope=${encodeURIComponent(scope)}`, { method: 'DELETE' });
+    toast(`Deleted ${result.deleted} ${label}.`, 'success');
+    await refreshEventViews();
+  } catch (e) {
+    if (e.status !== 401) toast('Delete failed: ' + e.message, 'error');
+  } finally {
+    setBusy(btn, false);
+  }
 }
 
 function renderEventList(box, rows, emptyHtml) {
@@ -2541,16 +2690,7 @@ function renderAttendance() {
 
   const recent = attendance.recent || [];
   $('attendance-log').innerHTML = recent.length
-    ? recent.map((record) => `
-      <div class="attendance-log-row">
-        <span class="attendance-log-kind ${record.kind === 'entered' ? 'is-in' : 'is-out'}"
-              aria-hidden="true">${record.kind === 'entered' ? '→' : '←'}</span>
-        <div class="attendance-log-info">
-          <b>${escapeHtml(record.person_name)}</b>
-          <small>${record.kind === 'entered' ? 'Entered' : 'Left'} · ${escapeHtml(record.camera_name || 'Camera')} · ${escapeHtml(formatEventTime(record.occurred_at))}</small>
-        </div>
-        <small class="attendance-log-by">${record.handled_by ? `Confirmed by ${escapeHtml(record.handled_by)}` : 'Confirmed'}</small>
-      </div>`).join('')
+    ? recent.map(attendanceLogRow).join('')
     : `<div class="empty-state empty-state-sm">
         No attendance records yet. Confirm an entrance or exit alert in Telegram
         to record one.
@@ -2575,6 +2715,7 @@ function attendanceCrossingCard(event) {
       <small>${escapeHtml(formatEventTime(event.created_at))}</small>
       ${event.handled_by ? `<small>Confirmed by ${escapeHtml(event.handled_by)}</small>` : ''}
     </div>
+    ${isAdminUser() ? deleteEventButton(event.id) : ''}
   </div>`;
 }
 
@@ -2621,6 +2762,7 @@ function attendanceLogRow(record) {
       <small>${record.kind === 'entered' ? 'Entered' : 'Left'} · ${escapeHtml(record.camera_name || 'Camera')} · ${escapeHtml(formatEventTime(record.occurred_at))}</small>
     </div>
     <small class="attendance-log-by">${record.handled_by ? `Confirmed by ${escapeHtml(record.handled_by)}` : 'Confirmed'}</small>
+    ${isAdminUser() ? deleteEventButton(record.event_id) : ''}
   </div>`;
 }
 
@@ -2711,6 +2853,72 @@ function renderCustomers() {
     : `<div class="empty-state empty-state-sm">No customer events match this status.</div>`;
   renderEventList($('customers-events'), events, empty);
 }
+
+// ============================================================
+//  Server capacity (observation only; never starts cameras)
+// ============================================================
+
+function serverNumber(id) { return Number($(id).value); }
+
+function renderServerResult(data) {
+  const box = $('server-results');
+  const verdict = {
+    sufficient: 'Sufficient for the observed workload',
+    insufficient: 'Insufficient / bottleneck observed',
+    unverified: 'Not yet verified',
+  }[data.verdict] || 'Not yet verified';
+  const hw = data.hardware;
+  const rec = data.recommendation;
+  const list = (items) => items.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+  box.hidden = false;
+  box.innerHTML = `
+    <h2>${escapeHtml(verdict)}</h2>
+    <p class="hint">Observed ${escapeHtml(data.sample_seconds)} seconds, ${data.observed.length} running camera(s). A short check is not a guarantee for sustained operation or different scenes.</p>
+    ${data.issues.length ? `<h3>Bottlenecks</h3><ul>${list(data.issues)}</ul>` : ''}
+    ${data.limitations.length ? `<h3>What remains unverified</h3><ul>${list(data.limitations)}</ul>` : ''}
+    <p class="hint">${escapeHtml((data.caveats || []).join(' '))}</p>
+    <h3>This server</h3>
+    <p>${escapeHtml(hw.logical_cores)} logical CPU cores (${escapeHtml(hw.physical_cores ?? 'unknown')} physical),
+    ${escapeHtml(hw.ram_gb)} GB RAM (${escapeHtml(hw.available_ram_gb)} GB available),
+    ${escapeHtml(hw.disk_free_gb)} GB free disk. Sample CPU use: ${escapeHtml(data.cpu_percent)}%.
+    Application memory: ${escapeHtml(data.process_ram_gb)} GB.</p>
+    <p class="hint">Inference backends: ${escapeHtml(hw.providers.map((p) => `${p.name} (${p.status})`).join(', ') || 'unknown')}.
+    ${hw.gpus.length ? `NVIDIA GPUs: ${escapeHtml(hw.gpus.map((g) => `${g.name}: ${g.used_mb}/${g.vram_mb} MB used, ${g.utilization_percent}% busy`).join('; '))}.` : 'GPU memory/utilization telemetry unavailable.'}</p>
+    ${data.observed.length ? `<h3>Observed cameras</h3><ul>${list(data.observed.map((p) => `${p.camera}: ${p.inference_fps} inference/s, source ${p.source_fps ?? 'unknown'} FPS, inference p95 ${p.inference_p95_ms ?? 'unknown'} ms`))}</ul>` : ''}
+    <h3>Planning requirements (estimates, not a certified server specification)</h3>
+    <p>CPU: ${rec.cpu_logical_cores_estimate == null ? 'requires a representative benchmark' : `at least ~${escapeHtml(rec.cpu_logical_cores_estimate)} logical cores based on observed CPU load`}.
+    RAM: ${rec.ram_gb_floor == null ? 'requires a representative benchmark' : `~${escapeHtml(rec.ram_gb_floor)} GB based on observed use`}.
+    Free snapshot storage: at least ${escapeHtml(rec.free_disk_gb_for_snapshots)} GB.
+    Camera inbound: ~${escapeHtml(rec.inbound_mbps)} Mbps; viewer outbound planning ceiling: ~${escapeHtml(rec.viewer_outbound_mbps_upper_bound)} Mbps.</p>
+    <p class="hint">${escapeHtml(rec.gpu)} ${rec.gpu_vram_gb_floor == null ? '' : `Current GPU memory occupancy with 30% headroom: at least ~${escapeHtml(rec.gpu_vram_gb_floor)} GB VRAM (includes other processes; not a GPU performance guarantee).`}
+    CPU estimates assume approximately linear scaling; verify with the full camera count before buying hardware. This check does not measure storage throughput or maximum network capacity.</p>`;
+}
+
+$('server-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!isAdminUser()) return;
+  const body = {
+    cameras: serverNumber('server-cameras'), fps: serverNumber('server-fps'),
+    width: serverNumber('server-width'), height: serverNumber('server-height'),
+    people_per_frame: serverNumber('server-people'),
+    viewers: serverNumber('server-viewers'),
+    camera_mbps: serverNumber('server-bitrate'),
+    snapshot_mb_per_day: serverNumber('server-snapshots'),
+    retention_days: serverNumber('server-retention'),
+    phone_detection: $('server-phone').checked,
+    face_recognition: $('server-face').checked,
+  };
+  const btn = $('server-check');
+  setBusy(btn, true, 'Measuring (15 seconds)…');
+  try {
+    const data = await api('/api/server/check', { method: 'POST', body: JSON.stringify(body) });
+    renderServerResult(data);
+  } catch (error) {
+    if (error.status !== 401) toast('Server check failed: ' + error.message, 'error');
+  } finally {
+    setBusy(btn, false);
+  }
+});
 
 // ============================================================
 //  Accounts
@@ -3293,6 +3501,8 @@ document.addEventListener('click', (e) => {
       openPersonModal(persons.find((p) => p.id === id), { focusFiles: true });
       break;
     case 'delete-person': deletePerson(id); break;
+    case 'delete-event': deleteEvent(id); break;
+    case 'clear-events': clearEvents(btn.dataset.scope, btn); break;
     default: break;
   }
 });

@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from aiortc import RTCPeerConnection, RTCSessionDescription
 from pydantic import BaseModel, Field
 
-from . import db, discovery, capabilities, pipeline, enroll, telegram_bot, review, training, crossing, detection_settings, face_review, auth
+from . import db, discovery, capabilities, pipeline, enroll, telegram_bot, review, training, crossing, detection_settings, face_review, auth, server_capacity
 from .config import FACE_DETECT_MODEL, FACE_EMBED_MODEL
 from .discovery import fetch_rtsp_url
 from .security import hash_password, verify_password, dummy_verify, token_digest
@@ -66,6 +66,7 @@ app = FastAPI(title="CCTV CV", lifespan=lifespan)
 
 _peers: dict[str, set[RTCPeerConnection]] = {}
 _candidate_assignment_lock = asyncio.Lock()
+_server_check_lock = asyncio.Lock()
 
 
 async def _close_peer(camera_id: str, pc: RTCPeerConnection) -> None:
@@ -161,7 +162,7 @@ _SELF_POST_PATHS = {"/api/auth/logout", "/api/auth/password"}
 _READER_POST_PREFIXES = ("/api/webrtc/offer/",)
 _ADMIN_GET_PREFIXES = (
     "/api/users", "/api/auth/audit", "/api/discover", "/api/telegram",
-    "/api/enrollment/review", "/api/training", "/api/detection",
+    "/api/enrollment/review", "/api/training", "/api/detection", "/api/server",
 )
 
 
@@ -690,6 +691,15 @@ def status() -> dict:
     return {"active": pipeline.list_pipelines()}
 
 
+@app.post("/api/server/check")
+async def check_server(plan: server_capacity.CapacityPlan):
+    if _server_check_lock.locked():
+        raise HTTPException(409, "A server assessment is already in progress")
+    async with _server_check_lock:
+        return await server_capacity.measure(
+            plan, viewer_count=sum(len(peers) for peers in _peers.values()))
+
+
 # ---------- WebRTC ----------
 
 @app.post("/api/webrtc/offer/{camera_id}")
@@ -1067,6 +1077,15 @@ def list_events(status: str = "confirmed", limit: int = 100,
             "counts": db.event_counts(customer=customer)}
 
 
+@app.delete("/api/events")
+def delete_events(scope: Literal["unassigned", "attendance", "customers", "telegram"]):
+    rows = db.delete_events_in_scope(scope)
+    for row in rows:
+        if row.get("snapshot_path"):
+            Path(row["snapshot_path"]).unlink(missing_ok=True)
+    return {"deleted": len(rows)}
+
+
 @app.get("/api/customers")
 def customers(status: str = "all", limit: int = 100,
               offset: int = 0) -> dict:
@@ -1092,6 +1111,16 @@ def event_snapshot(event_id: str):
     if not path.is_file():
         raise HTTPException(404, "Snapshot file missing")
     return FileResponse(str(path), media_type="image/jpeg")
+
+
+@app.delete("/api/events/{event_id}")
+def delete_event(event_id: str):
+    event = db.delete_event(event_id)
+    if event is None:
+        raise HTTPException(404, "Event not found")
+    if event.get("snapshot_path"):
+        Path(event["snapshot_path"]).unlink(missing_ok=True)
+    return {"ok": True}
 
 
 # ---------- Attendance ----------

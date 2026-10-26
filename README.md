@@ -57,14 +57,32 @@ The first visit redirects to the sign-in page. The bootstrap administrator is
 `admin` with password `12345`; **change that password after the first sign-in**
 using **Password** in the sidebar. See [Sign-in and accounts](#sign-in-and-accounts).
 
-The sidebar has eight sections. Administrators see **Overview** for attendance,
+The sidebar has nine sections. Administrators see **Overview** for attendance,
 customer and event counters; **Cameras** for discovery, configuration and live
 analytics feeds; **Enrollment** for registering people and reviewing
 unrecognised faces; **Attendance** for confirmed entrance/exit records;
-**Customers** for customer-tagged crossings; **Training** for phone-use review
+**Customers** for customer-tagged crossings; **Server** for a measured capacity
+assessment; **Training** for phone-use review
 and candidate models; **Telegram** for bot setup and admin-confirmed events; and
 **Accounts** for user management. Readers see the read-only sections only. The
 current section is kept in the URL, so it can be bookmarked or refreshed.
+Use the **Language / Язык / Til** selector in the sidebar (or on the sign-in
+page) to switch between English, Russian and Uzbek (Latin script). The choice
+is saved in that browser; it does not modify stored camera or event data.
+On narrow screens, use the menu button beside the page title to open the
+sidebar; choose a section or tap outside the drawer to close it.
+
+### Server capacity assessment
+
+Administrators can use **Server** to enter the planned camera count, FPS, stream
+resolution, expected people, viewers, bitrate, and snapshot storage/retention.
+The check observes existing running cameras for 15 seconds; it does **not** start
+new cameras or run synthetic inference. Results include CPU/RAM/disk inventory,
+measured inference rates and recent inference latency, observed bottlenecks and
+qualified planning estimates. A workload without comparable running cameras is
+reported **Not yet verified**, not approved based on hardware model names.
+Camera codecs, crowded scenes, GPU sharing, disk throughput and network peaks
+need a sustained full-size test before purchasing or certifying a server.
 
 ## Sign-in and accounts
 
